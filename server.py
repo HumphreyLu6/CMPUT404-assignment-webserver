@@ -1,5 +1,6 @@
 #  coding: utf-8 
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -29,10 +30,68 @@ import socketserver
 
 class MyWebServer(socketserver.BaseRequestHandler):
     
+    ROOT = "www"
+
     def handle(self):
-        self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        #ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Session   
+        #ref: https://stackoverflow.com/questions/7585435/best-way-to-convert-string-to-bytes-in-python-3
+
+        try:
+            self.data = self.request.recv(1024).strip().decode()
+            print ("\n\nGot a request of:\n%s\n" % self.data)
+            request_header_list = self.data.splitlines()
+            request_method, request_filepath, _ = request_header_list[0].split(" ")
+            print(request_method)
+
+            if request_method == "GET":
+                request_filepath = MyWebServer.ROOT + request_filepath
+                isExist = os.path.exists(request_filepath)
+                print("Request File Relative Path: %s" % request_filepath)
+                print("Path is %sValid!" % ("" if isExist else "not "))
+
+                if not isExist:
+                    response_body = bytearray(open(MyWebServer.ROOT + "/404NotFound.html").read(), encoding = "utf-8")
+                    self.request.send(b"HTTP/1.1 404 Page Not Found\r\n")
+                    self.request.send(b"Content-Type: text/css\r\n")
+                    self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                    self.request.send(response_body)
+                else:
+                    if os.path.isfile(request_filepath): #file
+                        file_type = request_filepath.split(".")[-1]
+                        response_body = open(request_filepath).read()
+                        self.request.send(b"HTTP/1.1 200 OK\r\n")
+                        if file_type == "css":
+                            self.request.send(b"Content-Type: text/css\r\n")
+                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                            self.request.send(bytearray(response_body, encoding = "utf-8"))
+                        elif file_type == "html":
+                            self.request.send(b"Content-Type: text/html\r\n")
+                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                            self.request.send(bytearray(response_body, encoding = "utf-8"))
+                    else: #dir
+                        if request_filepath[-1] != '//':
+                            response_body = bytearray(open(MyWebServer.ROOT + "/301Redirect.html").read(), encoding = "utf-8")
+                            self.request.send(b"HTTP/1.1 301 Redirect\r\n")
+                            self.request.send(b"Location: %s" % ("http://" + request_filepath + '//'))
+                            self.request.send(b"Content-Type: text/html\r\n")
+                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                            self.request.send(response_body)
+                        else:
+                            self.request.send(b"HTTP/1.1 200 OK\r\n")
+            else: 
+                print("Request method is not GET")
+                self.request.send(b"HTTP/1.1 405 Method Not Found\r\n")
+        
+        except Exception as e:
+            print(e)
+    
+    def send_response(self, header, body = None):
+        assert type(header) == bytes, "TypeError: invalid argument type for send_response(): %s" % str(type(header))
+        if body != None:
+            assert type(body) == bytes, "TypeError: invalid argument type for send_response(): %s" % str(type(header))
+        pass
+        
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
