@@ -1,6 +1,6 @@
 #  coding: utf-8 
 import socketserver
-import os
+import os, mimetypes, urllib
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -41,46 +41,61 @@ class MyWebServer(socketserver.BaseRequestHandler):
             print ("\n\nGot a request of:\n%s\n" % self.data)
             request_header_list = self.data.splitlines()
             request_method, request_filepath, _ = request_header_list[0].split(" ")
-            print(request_method)
+            #print("request_method: ", request_method, request_method == "GET")
 
             if request_method == "GET":
-                request_filepath = MyWebServer.ROOT + request_filepath
-                isExist = os.path.exists(request_filepath)
-                print("Request File Relative Path: %s" % request_filepath)
+                relative_filepath = os.path.relpath(MyWebServer.ROOT + request_filepath)
+                if "../" in relative_filepath:
+                    response_body = bytearray(open(MyWebServer.ROOT + "/404PageNotFound.html").read(), encoding = "utf-8")
+                    self.request.send(b"HTTP/1.1 404 Page Not Found\r\n")
+                    self.request.send(b"Content-Type: text/html\r\n")
+                    self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                    self.request.sendall(response_body)
+                    return
+
+                isExist = os.path.exists(relative_filepath)
+                print("Request File Relative Path: %s" % relative_filepath)
                 print("Path is %sValid!" % ("" if isExist else "not "))
 
                 if not isExist:
-                    response_body = bytearray(open(MyWebServer.ROOT + "/404NotFound.html").read(), encoding = "utf-8")
+                    response_body = bytearray(open(MyWebServer.ROOT + "/404PageNotFound.html").read(), encoding = "utf-8")
                     self.request.send(b"HTTP/1.1 404 Page Not Found\r\n")
-                    self.request.send(b"Content-Type: text/css\r\n")
+                    self.request.send(b"Content-Type: text/html\r\n")
                     self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                    self.request.send(response_body)
+                    self.request.sendall(response_body)
                 else:
-                    if os.path.isfile(request_filepath): #file
-                        file_type = request_filepath.split(".")[-1]
-                        response_body = open(request_filepath).read()
+                    if os.path.isfile(relative_filepath): #file
+                        response_body = bytearray(open(relative_filepath).read(), encoding = "utf-8")
                         self.request.send(b"HTTP/1.1 200 OK\r\n")
-                        if file_type == "css":
-                            self.request.send(b"Content-Type: text/css\r\n")
-                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                            self.request.send(bytearray(response_body, encoding = "utf-8"))
-                        elif file_type == "html":
-                            self.request.send(b"Content-Type: text/html\r\n")
-                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                            self.request.send(bytearray(response_body, encoding = "utf-8"))
+                        file_type, _ = mimetypes.guess_type(relative_filepath)
+                        print("file_type", file_type)
+                        self.request.send(bytearray("Content-Type: %s\r\n" % file_type, encoding = "utf-8"))
+                        self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                        self.request.send(response_body)
                     else: #dir
-                        if request_filepath[-1] != '//':
-                            response_body = bytearray(open(MyWebServer.ROOT + "/301Redirect.html").read(), encoding = "utf-8")
+                        if request_filepath[-1] != '/':
                             self.request.send(b"HTTP/1.1 301 Redirect\r\n")
-                            self.request.send(b"Location: %s" % ("http://" + request_filepath + '//'))
+                            response_body = bytearray(open(MyWebServer.ROOT + "/301Redirect.html").read(), encoding = "utf-8")
+                            self.request.send(b"Location: %s/\r\n" % bytearray(request_filepath, encoding = 'utf-8'))
                             self.request.send(b"Content-Type: text/html\r\n")
                             self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
                             self.request.send(response_body)
                         else:
+                            return_file = relative_filepath + "/index.html"
+                            file_type, _ = mimetypes.guess_type(return_file)
                             self.request.send(b"HTTP/1.1 200 OK\r\n")
+                            response_body = bytearray(open(return_file).read(), encoding = "utf-8")
+                            self.request.send(bytearray("Content-Type: %s\r\n" % file_type, encoding = "utf-8"))
+                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                            self.request.send(response_body)
+                            
             else: 
                 print("Request method is not GET")
+                response_body = bytearray(open(MyWebServer.ROOT + "/405MethodNotFound.html").read(), encoding = "utf-8")
                 self.request.send(b"HTTP/1.1 405 Method Not Found\r\n")
+                self.request.send(b"Content-Type: text/html\r\n")
+                self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
+                self.request.send(response_body)
         
         except Exception as e:
             print(e)

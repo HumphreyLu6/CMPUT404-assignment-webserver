@@ -16,7 +16,7 @@
 # run python freetests.py
 
 from urllib import request
-import unittest
+import unittest, os
 
 BASEURL = "http://127.0.0.1:8080"
 
@@ -36,11 +36,11 @@ class TestYourWebserver(unittest.TestCase):
     #     req = request.urlopen(url, None, 3)
     #     self.assertTrue( req.getcode()  == 200 , "200 OK Not FOUND!")
 
-    def test_get_indexhtml(self):
-        url = self.baseurl + "/index.html"
-        #url = self.baseurl + "/hardcode/deep/index.html"
-        req = request.urlopen(url, None, 3)
-        self.assertTrue( req.getcode()  == 200 , "200 OK Not FOUND!")
+    # def test_get_indexhtml(self):
+    #     url = self.baseurl + "/index.html"
+    #     #url = self.baseurl + "/hardcode/deep/index.html"
+    #     req = request.urlopen(url, None, 3)
+    #     self.assertTrue( req.getcode()  == 200 , "200 OK Not FOUND!")
 
 
     # def test_get_404(self):
@@ -52,6 +52,12 @@ class TestYourWebserver(unittest.TestCase):
     #         self.assertTrue( e.getcode()  == 404 , ("404 Not FOUND! %d" % e.getcode()))
     #     else:
     #         self.assertTrue( False, "Another Error was thrown!")
+
+    def test_get_root(self):
+        url = self.baseurl + "/"
+        req = request.urlopen(url, None, 3)
+        self.assertTrue( req.getcode()  == 200 , "200 OK Not FOUND!")
+
 
 
 if __name__ == '__main__':
