@@ -1,6 +1,6 @@
 #  coding: utf-8 
 import socketserver
-import os, mimetypes, urllib
+import os, mimetypes
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -29,84 +29,159 @@ import os, mimetypes, urllib
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
-    
-    ROOT = "www"
+
+    # def __init__(self, root = "www"):
+    #     """
+    #     Initilize a new "socketserver.BaseRequestHandler" instance.
+
+    #     Args:
+    #         root(path): A relative path to this python script leads to the 
+    #             root folder of this server. Defaults to "www"
+    #     """
+    #     if os.path.isdir(self.root):
+    #         self.root = "www"
+    #     else:
+    #         raise Exception("Root folder does not exist.")
 
     def handle(self):
-        #ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Session   
-        #ref: https://stackoverflow.com/questions/7585435/best-way-to-convert-string-to-bytes-in-python-3
+        """
+        This method handles all the requests received. 
+        """
 
         try:
+            self.root = "www/"
+            self.File301 = "301MovedPermanently.html"
+            self.File404 = "404PageNotFound.html"
+            self.File405 = "405MethodNotFound.html"
+
             self.data = self.request.recv(1024).strip().decode()
-            print ("\n\nGot a request of:\n%s\n" % self.data)
-            request_header_list = self.data.splitlines()
-            request_method, request_filepath, _ = request_header_list[0].split(" ")
-            #print("request_method: ", request_method, request_method == "GET")
+            print("self.data:\n", self.data)
+            dataLines = self.data.splitlines()
+            requestMethod, requestFilepath, _ = dataLines[0].split(" ")
 
-            if request_method == "GET":
-                relative_filepath = os.path.relpath(MyWebServer.ROOT + request_filepath)
-                if "../" in relative_filepath:
-                    response_body = bytearray(open(MyWebServer.ROOT + "/404PageNotFound.html").read(), encoding = "utf-8")
-                    self.request.send(b"HTTP/1.1 404 Page Not Found\r\n")
-                    self.request.send(b"Content-Type: text/html\r\n")
-                    self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                    self.request.sendall(response_body)
+            if requestMethod != "GET":
+                bodyLength, body, fileType = self.readfile(self.File405)
+                header = bytearray(
+                            "HTTP/1.1 405 Method Not Found\r\n" \
+                            "Content-Type: %s\r\n" \
+                            "Content-Length: %d\r\n\r\n" % (fileType, bodyLength),
+                            encoding = "utf-8")
+                self.sendResponse(header, body)
+                return
+            
+            if self.verify(requestFilepath) == False:
+                bodyLength, body, fileType = self.readfile(self.File404)
+                header = bytearray(
+                            "HTTP/1.1 404 Page Not Found\r\n" \
+                            "Content-Type: %s\r\n" \
+                            "Content-Length: %d\r\n\r\n" % (fileType, bodyLength),
+                            encoding = "utf-8")
+                self.sendResponse(header, body)
+                return
+            
+            #path is a folder
+            if os.path.isdir(self.root + requestFilepath):
+                if requestFilepath[-1] != "/":
+                    bodyLength, body, fileType = self.readfile(self.File301)
+                    newLocation = requestFilepath + "/"
+                    header = bytearray(
+                                "HTTP/1.1 301 Moved Permanently\r\n" \
+                                "Location: %s\r\n" \
+                                "Content-Type: %s\r\n" \
+                                "Content-Length: %d\r\n\r\n" % \
+                                (newLocation, fileType, bodyLength),
+                                encoding = "utf-8")
+                    self.sendResponse(header, body)
                     return
-
-                isExist = os.path.exists(relative_filepath)
-                print("Request File Relative Path: %s" % relative_filepath)
-                print("Path is %sValid!" % ("" if isExist else "not "))
-
-                if not isExist:
-                    response_body = bytearray(open(MyWebServer.ROOT + "/404PageNotFound.html").read(), encoding = "utf-8")
-                    self.request.send(b"HTTP/1.1 404 Page Not Found\r\n")
-                    self.request.send(b"Content-Type: text/html\r\n")
-                    self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                    self.request.sendall(response_body)
                 else:
-                    if os.path.isfile(relative_filepath): #file
-                        response_body = bytearray(open(relative_filepath).read(), encoding = "utf-8")
-                        self.request.send(b"HTTP/1.1 200 OK\r\n")
-                        file_type, _ = mimetypes.guess_type(relative_filepath)
-                        print("file_type", file_type)
-                        self.request.send(bytearray("Content-Type: %s\r\n" % file_type, encoding = "utf-8"))
-                        self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                        self.request.send(response_body)
-                    else: #dir
-                        if request_filepath[-1] != '/':
-                            self.request.send(b"HTTP/1.1 301 Redirect\r\n")
-                            response_body = bytearray(open(MyWebServer.ROOT + "/301Redirect.html").read(), encoding = "utf-8")
-                            self.request.send(b"Location: %s/\r\n" % bytearray(request_filepath, encoding = 'utf-8'))
-                            self.request.send(b"Content-Type: text/html\r\n")
-                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                            self.request.send(response_body)
-                        else:
-                            return_file = relative_filepath + "/index.html"
-                            file_type, _ = mimetypes.guess_type(return_file)
-                            self.request.send(b"HTTP/1.1 200 OK\r\n")
-                            response_body = bytearray(open(return_file).read(), encoding = "utf-8")
-                            self.request.send(bytearray("Content-Type: %s\r\n" % file_type, encoding = "utf-8"))
-                            self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                            self.request.send(response_body)
-                            
-            else: 
-                print("Request method is not GET")
-                response_body = bytearray(open(MyWebServer.ROOT + "/405MethodNotFound.html").read(), encoding = "utf-8")
-                self.request.send(b"HTTP/1.1 405 Method Not Found\r\n")
-                self.request.send(b"Content-Type: text/html\r\n")
-                self.request.send(b"Content-Length: %d\r\n\r\n" % len(response_body))
-                self.request.send(response_body)
-        
+                    bodyLength, body, fileType = self.readfile(requestFilepath + "/index.html")
+                    header = bytearray(
+                                "HTTP/1.1 200 OK\r\n" \
+                                "Content-Type: %s\r\n" \
+                                "Content-Length: %d\r\n\r\n" % (fileType, bodyLength),
+                                encoding = "utf-8")
+                    self.sendResponse(header, body)
+                    return
+            
+            #path is a file
+            if os.path.isfile(self.root + requestFilepath):
+                bodyLength, body, fileType = self.readfile(requestFilepath)
+                header = bytearray(
+                            "HTTP/1.1 200 OK\r\n" \
+                            "Content-Type: %s\r\n" \
+                            "Content-Length: %d\r\n\r\n" % (fileType, bodyLength),
+                            encoding = "utf-8")
+                self.sendResponse(header, body)
+                return
+
         except Exception as e:
             print(e)
-    
-    def send_response(self, header, body = None):
-        assert type(header) == bytes, "TypeError: invalid argument type for send_response(): %s" % str(type(header))
-        if body != None:
-            assert type(body) == bytes, "TypeError: invalid argument type for send_response(): %s" % str(type(header))
-        pass
-        
+            
+            
 
+
+    def verify(self, path):
+        """
+        This method verifies if a path exists in the root folder which this 
+        server is serving for, note for the sake of security, paths that led
+        to locations which is not under the root folder are not valid.
+
+        Args:
+            path(str): A relative path of a file to the root folder.
+
+        Returns:
+            bool: True if the path exists, False otherwise.
+        """
+        full_path = self.root + path
+        if not os.path.exists(full_path):
+            return False
+        
+        rel_path = os.path.relpath(full_path, self.root)
+
+        if "../" in rel_path:
+            return False
+        
+        return True
+
+
+    def readfile(self, path):
+        """
+        This method opens and reads a file.
+
+        Args:
+            path(str): A relative path of a file to the root folder.
+        
+        Returns:
+            int: The length of the bytearray. 
+            bytearray: The bytearray format of the content read from the file.
+            str: Mimetype of the file.
+        """ 
+        file = open(self.root + path)
+        content = bytearray(
+            file.read(),
+            encoding = "utf-8")
+        file.close()
+        file_type, _ = mimetypes.guess_type(self.root + path)
+        return len(content), content, file_type
+
+    def sendResponse(self, header, body = None):
+        """
+        This method sends response to a client
+        
+        Args:
+            header(bytes): The response header
+            body(bytes/NoneType): The response body, defaults to None
+        """
+        # assert type(header) == bytearray, "TypeError: invalid argument type for send_response(): %s" % str(type(header))
+        # if body != None:
+        #     assert type(body) == bytearray, "TypeError: invalid argument type for send_response(): %s" % str(type(header))
+        try:
+            self.request.sendall(header)
+            if body != None:
+                self.request.sendall(body)
+        except Exception as e:
+            print(e)
+        return
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
