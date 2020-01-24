@@ -2,7 +2,7 @@
 import socketserver
 import os, mimetypes
 
-# Copyright 2013 Abram Hindle, Eddie Antonio Santos
+# Copyright 2013 Abram Hindle, Eddie Antonio Santos, Zhonghao Lu
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,21 +27,16 @@ import os, mimetypes
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
+# Rference: https://stackoverflow.com/questions/7585435/best-way-to-convert-string-to-bytes-in-python-3
+# answered by agf Sep 28 '11 at 15:27, edited by Garrett Hyde Oct 14 '17 at 4:42
+
+# Reference: https://developer.mozilla.org/en-US/docs/Web/HTTP/Session
+# modified by MDN contributors in Mar 23 '19.
+
+# Reference: https://stackoverflow.com/questions/43580/how-to-find-the-mime-type-of-a-file-in-python
+# edited by jfs June 28 '14 at 16:43, edited by Dave Webb Sep 4 '08 at 12:12
 
 class MyWebServer(socketserver.BaseRequestHandler):
-
-    # def __init__(self, root = "www"):
-    #     """
-    #     Initilize a new "socketserver.BaseRequestHandler" instance.
-
-    #     Args:
-    #         root(path): A relative path to this python script leads to the 
-    #             root folder of this server. Defaults to "www"
-    #     """
-    #     if os.path.isdir(self.root):
-    #         self.root = "www"
-    #     else:
-    #         raise Exception("Root folder does not exist.")
 
     def handle(self):
         """
