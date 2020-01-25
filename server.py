@@ -49,13 +49,13 @@ class MyWebServer(socketserver.BaseRequestHandler):
         """
 
         try:
-            self.root = "www/"
-            self.File301 = "301MovedPermanently.html"
-            self.File404 = "404PageNotFound.html"
-            self.File405 = "405MethodNotFound.html"
+            self.root = "www"
+            self.File301 = "/301MovedPermanently.html"
+            self.File404 = "/404PageNotFound.html"
+            self.File405 = "/405MethodNotFound.html"
 
             self.data = self.request.recv(1024).strip().decode()
-            print("self.data:\n", self.data)
+            print("\nGot a request:\n", self.data)
             dataLines = self.data.splitlines()
             requestMethod, requestFilepath, _ = dataLines[0].split(" ")
 
@@ -137,7 +137,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
             return False
         
         rel_path = os.path.relpath(full_path, self.root)
-
         if "../" in rel_path:
             return False
         
